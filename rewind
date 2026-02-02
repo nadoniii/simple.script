@@ -1,0 +1,81 @@
+-- Settings
+local REWIND_KEY = Enum.KeyCode.R -- Do any key u want but when using number u must type it like this "one" not "1"
+local REWIND_SECONDS = 60
+
+-- Variables
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local player = game.Players.LocalPlayer
+
+local history = {}
+local maxStored = REWIND_SECONDS * 60 
+local isRewinding = false
+
+RunService.Heartbeat:Connect(function()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChild("Humanoid")
+    local animateScript = char and char:FindFirstChild("Animate")
+
+    if not root or not hum or hum.Health <= 0 then
+        history = {}
+        return
+    end
+
+    if UIS:IsKeyDown(REWIND_KEY) then
+        isRewinding = true
+        if #history > 0 then
+            if animateScript then animateScript.Disabled = true end
+            
+            local snapshot = table.remove(history, #history)
+            root.CFrame = root.CFrame:Lerp(snapshot.cf, 0.5)
+            root.AssemblyLinearVelocity = Vector3.zero
+            
+            -- RECORDED TRACKS: Update their positions
+            for _, animData in pairs(snapshot.anims) do
+                local track = animData.track
+                if track then
+                    if not track.IsPlaying then track:Play(0) end
+                    track.TimePosition = animData.pos
+                    track:AdjustSpeed(0)
+                    track:AdjustWeight(animData.weight)
+                end
+            end
+        end
+    else
+        -- THE FIX: Clean up stuck animations on release
+        if isRewinding then
+            isRewinding = false
+            
+            -- Re-enable the master animation script
+            if animateScript then animateScript.Disabled = false end
+            
+            -- Stop EVERY track that we might have frozen
+            for _, track in pairs(hum:GetPlayingAnimationTracks()) do
+                track:Stop(0.1) -- Fade out over 0.1s for smoothness
+                track:AdjustSpeed(1) -- Reset speed just in case
+            end
+        end
+
+        -- RECORDING MODE
+        local currentAnims = {}
+        for _, track in pairs(hum:GetPlayingAnimationTracks()) do
+            if track.WeightCurrent > 0 then
+                table.insert(currentAnims, {
+                    track = track,
+                    pos = track.TimePosition,
+                    weight = track.WeightCurrent
+                })
+            end
+        end
+
+        table.insert(history, {
+            cf = root.CFrame,
+            anims = currentAnims
+        })
+        
+        if #history > maxStored then
+            table.remove(history, 1)
+        end
+    end
+end)
