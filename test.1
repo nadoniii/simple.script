@@ -1,0 +1,193 @@
+-- [PerfectLua] Da Hood Utility GUI
+-- Created by: nadon
+-- Features: Speed, Fly, Infinite Jump
+-- Note: Use responsibly. Standard property modifications are used for maximum compatibility.
+
+local Players: Players = game:GetService("Players")
+local CoreGui: CoreGui = game:GetService("CoreGui")
+local UserInputService: UserInputService = game:GetService("UserInputService")
+local RunService: RunService = game:GetService("RunService")
+local TweenService: TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+-- UI State Variables
+local FlyEnabled: boolean = false
+local SpeedEnabled: boolean = false
+local FlySpeed: number = 50
+local NormalSpeed: number = 16
+local CustomSpeed: number = 50
+
+-- UI Creation
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local ButtonLayout = Instance.new("UIListLayout")
+local SpeedToggle = Instance.new("TextButton")
+local FlyToggle = Instance.new("TextButton")
+local InfJumpToggle = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+-- Protect UI from basic detection
+pcall(function()
+    ScreenGui.Name = "NadonUtility_" .. math.random(1000, 9999)
+    ScreenGui.Parent = CoreGui
+    ScreenGui.ResetOnSpawn = false
+end)
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+MainFrame.Size = UDim2.new(0, 200, 0, 250)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Deprecated but simple for beginner scripts; ideally use a custom drag script
+
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Parent = MainFrame
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Size = UDim2.new(1, 0, 0, 40)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "Made by nadon"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 18
+
+ButtonLayout.Parent = MainFrame
+ButtonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout.Padding = UDim.new(0, 10)
+
+-- Helper function to create buttons
+local function CreateButton(name: string, text: string, layoutOrder: number)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Parent = MainFrame
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Font = Enum.Font.Gotham
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.LayoutOrder = layoutOrder
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = btn
+    
+    return btn
+end
+
+local SpeedBtn = CreateButton("SpeedBtn", "Speed: OFF", 1)
+local FlyBtn = CreateButton("FlyBtn", "Fly: OFF", 2)
+local JumpBtn = CreateButton("JumpBtn", "Inf Jump: OFF", 3)
+
+-- Fly Logic
+local BodyVelocity: BodyVelocity? = nil
+local BodyGyro: BodyGyro? = nil
+
+local function ToggleFly()
+    FlyEnabled = not FlyEnabled
+    FlyBtn.Text = "Fly: " .. (FlyEnabled and "ON" or "OFF")
+    FlyBtn.BackgroundColor3 = FlyEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    if FlyEnabled then
+        BodyVelocity = Instance.new("BodyVelocity")
+        BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        BodyVelocity.Parent = char.HumanoidRootPart
+        
+        BodyGyro = Instance.new("BodyGyro")
+        BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        BodyGyro.CFrame = char.HumanoidRootPart.CFrame
+        BodyGyro.Parent = char.HumanoidRootPart
+        
+        task.spawn(function()
+            while FlyEnabled do
+                local camera = workspace.CurrentCamera
+                local moveDir = char.Humanoid.MoveDirection
+                
+                if BodyVelocity and BodyGyro then
+                    BodyVelocity.Velocity = moveDir * FlySpeed
+                    BodyGyro.CFrame = camera.CFrame
+                end
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    else
+        if BodyVelocity then BodyVelocity:Destroy() end
+        if BodyGyro then BodyGyro:Destroy() end
+    end
+end
+
+-- Speed Logic
+local function ToggleSpeed()
+    SpeedEnabled = not SpeedEnabled
+    SpeedBtn.Text = "Speed: " .. (SpeedEnabled and "ON" or "OFF")
+    SpeedBtn.BackgroundColor3 = SpeedEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    
+    task.spawn(function()
+        while SpeedEnabled do
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid.WalkSpeed = CustomSpeed
+            end
+            task.wait(0.1)
+        end
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = NormalSpeed
+        end
+    end)
+end
+
+-- Infinite Jump Logic
+local InfJumpEnabled: boolean = false
+local function ToggleJump()
+    InfJumpEnabled = not InfJumpEnabled
+    JumpBtn.Text = "Inf Jump: " .. (InfJumpEnabled and "ON" or "OFF")
+    JumpBtn.BackgroundColor3 = InfJumpEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+end
+
+UserInputService.JumpRequest:Connect(function()
+    if InfJumpEnabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- Button Connections
+SpeedBtn.MouseButton1Click:Connect(function()
+    pcall(ToggleSpeed)
+end)
+
+FlyBtn.MouseButton1Click:Connect(function()
+    pcall(ToggleFly)
+end)
+
+JumpBtn.MouseButton1Click:Connect(function()
+    pcall(ToggleJump)
+end)
+
+-- Handle Character Respawn
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    if SpeedEnabled then
+        task.wait(1)
+        newChar:WaitForChild("Humanoid").WalkSpeed = CustomSpeed
+    end
+end)
+
+print('[PerfectLua] Script loaded successfully')
+-- Script created by nadon - Undetected property-based methods used.
+-- Toggle UI with the button on screen.
+-- Note: Da Hood has strong anti-cheats; stay below 100 Speed for safety.
+
